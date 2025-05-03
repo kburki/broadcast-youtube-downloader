@@ -95,7 +95,7 @@ Download and convert a single YouTube video:
 
 Example:
 ```bash
-./yt_to_server.sh "https://www.youtube.com/watch?v=dQw4w9WgXcQ" "SHILS_001"
+./yt_to_server.sh "https://www.youtube.com/watch?v=dQw4w9WgXcQ" "SHILS2501"
 ```
 
 ### YouTube Playlists
@@ -112,6 +112,8 @@ Options:
 - `-d, --digits NUMBER` : Number of digits to pad with zeros (default: 3)
 - `-l, --limit NUMBER` : Limit number of videos to download (default: all)
 - `-h, --help` : Show help message
+- `-t, --trim-start TIME` :  Trim from start of video (format: MM:SS or seconds)"
+- `-e, --trim-end TIME`  :    Trim from end of video (format: MM:SS or seconds)"
 
 Examples:
 ```bash
@@ -129,6 +131,9 @@ Examples:
 
 # Exact filename with no number (creates SHILS2501.mxf)
 ./playlist_to_server.sh -p "SHILS2501" -s 1 -d 0 "https://www.youtube.com/playlist?list=PLAYLIST_ID"
+
+# Tripm start and end times from the video 
+./yt_to_server.sh -t 1:30 -e 20 'https://www.youtube.com/watch?v=VIDEO_ID' 'SHILS2510'"
 ```
 
 ## Video Output Specifications
