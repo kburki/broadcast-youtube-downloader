@@ -221,31 +221,18 @@ echo "$video_ids" | while read -r video_id; do
     fi
   fi
   
-  # Prepare output settings based on format
-  if [ "$OUTPUT_FORMAT" = "mxf" ]; then
-    # MXF format with broadcast settings
-    OUTPUT_SETTINGS="-c:v mpeg2video -profile:v 0 -level:v 2 -b:v 30M \
-      -pix_fmt yuv422p -s 1920x1080 -flags +ilme+ildct -top 1 \
-      -aspect 16:9 -r ntsc \
-      -c:a pcm_s16le -ar 48000 -ac 2 \
-      -af \"loudnorm=I=-24:TP=-2:LRA=7:print_format=summary\" \
-      -f mxf"
-    
-    # Set output path for MXF (FTP server)
-    OUTPUT_PATH="\"ftp://$FTP_USER:$FTP_PASS@$FTP_SERVER$FTP_PATH/${output_name}.mxf\""
-  else
-    # MP4 format with high quality but compatible settings for editing
-    OUTPUT_SETTINGS="-c:v libx264 -profile:v high -level:v 4.1 -crf 18 \
-      -pix_fmt yuv420p -s 1920x1080 \
-      -aspect 16:9 \
-      -c:a aac -b:a 384k -ar 48000 -ac 2 \
-      -af \"loudnorm=I=-24:TP=-2:LRA=7:print_format=summary\" \
-      -movflags +faststart \
-      -f mp4"
-    
-    # Set output path for MP4 (local directory)
-    OUTPUT_PATH="\"$LOCAL_OUTPUT_DIR/${output_name}.mp4\""
-  fi
+# Prepare output settings based on format
+if [ "$OUTPUT_FORMAT" = "mxf" ]; then
+  # MXF format with broadcast settings
+  OUTPUT_SETTINGS="-c:v mpeg2video -profile:v 0 -level:v 2 -b:v 30M \
+    -pix_fmt yuv422p -s 1920x1080 -flags +ilme+ildct -top 1 \
+    -aspect 16:9 -r ntsc \
+    -c:a pcm_s16le -ar 48000 -ac 2 \
+    -af \"loudnorm=I=-24:TP=-2:LRA=7:print_format=summary\" \
+    -f mxf"
+  
+  # Set output path for MXF (FTP server)
+  OUTPUT_PATH="\"ftp://$FTP_USER:$FTP_PASS@$FTP_SERVER$FTP_PATH/${output_name}.mxf\""
   
   # Build the ffmpeg command
   FFMPEG_CMD="yt-dlp -f 'bestvideo[height<=1080]+bestaudio/best[height<=1080]' -o - \"$video_url\" | \
@@ -255,11 +242,7 @@ echo "$video_ids" | while read -r video_id; do
   eval $FFMPEG_CMD
   
   if [ $? -eq 0 ]; then
-    if [ "$OUTPUT_FORMAT" = "mp4" ]; then
-      echo "Success: $video_title saved as $LOCAL_OUTPUT_DIR/${output_name}.mp4"
-    else
-      echo "Success: $video_title uploaded as ${output_name}.mxf"
-    fi
+    echo "Success: $video_title uploaded as ${output_name}.mxf"
   else
     echo "Error processing video. Trying alternative method..."
     
@@ -280,11 +263,7 @@ echo "$video_ids" | while read -r video_id; do
       rm "$TMP_FILE"
       
       if [ $? -eq 0 ]; then
-        if [ "$OUTPUT_FORMAT" = "mp4" ]; then
-          echo "Success: $video_title saved as $LOCAL_OUTPUT_DIR/${output_name}.mp4"
-        else
-          echo "Success: $video_title uploaded as ${output_name}.mxf"
-        fi
+        echo "Success: $video_title uploaded as ${output_name}.mxf"
       else
         echo "Failed to process video: $video_title"
         echo "Continuing with next video..."
@@ -294,7 +273,83 @@ echo "$video_ids" | while read -r video_id; do
       echo "Continuing with next video..."
     fi
   fi
+else
+  # MP4 output - REPLACE THIS ENTIRE ELSE SECTION WITH THE CODE BELOW
+  echo "Creating MP4 file: $LOCAL_OUTPUT_DIR/${output_name}.mp4"
   
+  # First try with copy codec
+  yt-dlp -f 'bestvideo[height<=1080]+bestaudio/best[height<=1080]' -o - "$video_url" | \
+    ffmpeg -i pipe:0 $TRIM_OPTIONS \
+      -c:v copy \
+      -c:a aac -b:a 384k -ar 48000 -ac 2 \
+      -af "loudnorm=I=-24:TP=-2:LRA=7:print_format=summary" \
+      -movflags +faststart \
+      -f mp4 "$LOCAL_OUTPUT_DIR/${output_name}.mp4"
+  
+  # If that fails, try with transcoding
+  if [ $? -ne 0 ]; then
+    echo "Direct stream copy failed. Trying with transcoding..."
+    yt-dlp -f 'bestvideo[height<=1080]+bestaudio/best[height<=1080]' -o - "$video_url" | \
+      ffmpeg -i pipe:0 $TRIM_OPTIONS \
+        -c:v libx264 -profile:v high -level:v 4.1 -crf 18 \
+        -pix_fmt yuv420p -s 1920x1080 \
+        -aspect 16:9 \
+        -c:a aac -b:a 384k -ar 48000 -ac 2 \
+        -af "loudnorm=I=-24:TP=-2:LRA=7:print_format=summary" \
+        -movflags +faststart \
+        -f mp4 "$LOCAL_OUTPUT_DIR/${output_name}.mp4"
+  fi
+  
+  if [ $? -eq 0 ]; then
+    echo "Success: $video_title saved as $LOCAL_OUTPUT_DIR/${output_name}.mp4"
+  else
+    echo "MP4 creation failed. Trying alternative method..."
+    
+    # Try downloading to temporary file first
+    TMP_FILE="temp_${output_name}.mp4"
+    echo "Downloading to temporary file..."
+    
+    yt-dlp -f 'bestvideo[height<=1080]+bestaudio/best[height<=1080]' -o "$TMP_FILE" "$video_url"
+      
+    if [ $? -eq 0 ]; then
+      echo "Download successful. Converting..."
+      
+      # First try with copy codec
+      ffmpeg -i "$TMP_FILE" $TRIM_OPTIONS \
+        -c:v copy \
+        -c:a aac -b:a 384k -ar 48000 -ac 2 \
+        -af "loudnorm=I=-24:TP=-2:LRA=7:print_format=summary" \
+        -movflags +faststart \
+        -f mp4 "$LOCAL_OUTPUT_DIR/${output_name}.mp4"
+      
+      # If that fails, try with transcoding
+      if [ $? -ne 0 ]; then
+        echo "Direct stream copy failed. Trying with transcoding..."
+        ffmpeg -i "$TMP_FILE" $TRIM_OPTIONS \
+          -c:v libx264 -profile:v high -level:v 4.1 -crf 18 \
+          -pix_fmt yuv420p -s 1920x1080 \
+          -aspect 16:9 \
+          -c:a aac -b:a 384k -ar 48000 -ac 2 \
+          -af "loudnorm=I=-24:TP=-2:LRA=7:print_format=summary" \
+          -movflags +faststart \
+          -f mp4 "$LOCAL_OUTPUT_DIR/${output_name}.mp4"
+      fi
+      
+      # Clean up temp file
+      rm "$TMP_FILE"
+      
+      if [ $? -eq 0 ]; then
+        echo "Success: $video_title saved as $LOCAL_OUTPUT_DIR/${output_name}.mp4"
+      else
+        echo "Failed to process video: $video_title"
+        echo "Continuing with next video..."
+      fi
+    else
+      echo "Failed to download video: $video_title"
+      echo "Continuing with next video..."
+    fi
+  fi
+fi
   # Increment for next video
   current_number=$((current_number + 1))
   count=$((count + 1))

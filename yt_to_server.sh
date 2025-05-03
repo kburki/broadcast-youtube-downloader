@@ -84,11 +84,42 @@ fi
 echo "Downloading and converting video..."
 echo "Video URL: $YT_URL"
 echo "Output format: $OUTPUT_FORMAT"
-if [ "$OUTPUT_FORMAT" = "mp4" ]; then
-  echo "Output will be saved locally to: $LOCAL_OUTPUT_DIR/$OUTPUT_NAME.$OUTPUT_FORMAT"
-else
-  echo "Output will be uploaded to FTP server as: $OUTPUT_NAME.$OUTPUT_FORMAT"
-fi
+# For MP4 output, try to use copy first
+  if [ "$OUTPUT_FORMAT" = "mp4" ]; then
+    echo "Creating MP4 file: $LOCAL_OUTPUT_DIR/${OUTPUT_NAME}.mp4"
+    
+    # First try with copy codec
+    yt-dlp -f 'bestvideo[height<=1080]+bestaudio/best[height<=1080]' --no-playlist -o - "$YT_URL" | \
+      ffmpeg -i pipe:0 $TRIM_OPTIONS \
+        -c:v copy \
+        -c:a aac -b:a 384k -ar 48000 -ac 2 \
+        -af "loudnorm=I=-24:TP=-2:LRA=7:print_format=summary" \
+        -movflags +faststart \
+        -f mp4 "$LOCAL_OUTPUT_DIR/${OUTPUT_NAME}.mp4"
+    
+    # If that fails, try with transcoding
+    if [ $? -ne 0 ]; then
+      echo "Direct stream copy failed. Trying with transcoding..."
+      yt-dlp -f 'bestvideo[height<=1080]+bestaudio/best[height<=1080]' --no-playlist -o - "$YT_URL" | \
+        ffmpeg -i pipe:0 $TRIM_OPTIONS \
+          -c:v libx264 -profile:v high -level:v 4.1 -crf 18 \
+          -pix_fmt yuv420p -s 1920x1080 \
+          -aspect 16:9 \
+          -c:a aac -b:a 384k -ar 48000 -ac 2 \
+          -af "loudnorm=I=-24:TP=-2:LRA=7:print_format=summary" \
+          -movflags +faststart \
+          -f mp4 "$LOCAL_OUTPUT_DIR/${OUTPUT_NAME}.mp4"
+    fi
+    
+    if [ $? -eq 0 ]; then
+      echo "MP4 creation successful: $LOCAL_OUTPUT_DIR/${OUTPUT_NAME}.mp4"
+    else
+      echo "MP4 creation failed."
+    fi
+  } else {
+    # MXF to server - existing code
+    # ...
+  }
 
 # Function to convert time format (HH:MM:SS or seconds) to seconds
 convert_to_seconds() {
