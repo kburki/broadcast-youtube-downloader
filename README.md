@@ -136,6 +136,23 @@ Examples:
 ./yt_to_server.sh -t 1:30 -e 20 'https://www.youtube.com/watch?v=VIDEO_ID' 'SHILS2510'"
 ```
 
+## New Features
+
+- **Specify End Point**: Instead of trimming a fixed amount from the end, you can now specify an exact out point using `-o` or `--out-point`.
+- **MP4 Output Option**: You can now output to MP4 files locally instead of MXF files on the server, making it easier to import into Adobe Premiere.
+
+### Examples
+
+```bash
+# Download a video and trim it with specific in/out points
+./yt_to_server.sh -t 00:01:30 -o 00:45:20 "https://www.youtube.com/watch?v=VIDEO_ID" "SHILS_001"
+
+# Download a video as MP4 for local editing
+./yt_to_server.sh -f mp4 "https://www.youtube.com/watch?v=VIDEO_ID" "SHILS_001"
+
+# Download a playlist as MP4 files to a specific directory
+./playlist_to_server.sh -f mp4 -dir "./premiere_files" "https://www.youtube.com/playlist?list=PLAYLIST_ID"
+
 ## Video Output Specifications
 
 All videos are converted to the following broadcast-ready specifications:
